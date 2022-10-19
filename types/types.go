@@ -199,5 +199,5 @@ func (g Genesis) MarshalJSON() ([]byte, error) {
 	enc.Number = math.HexOrDecimal64(g.Number)
 	enc.GasUsed = math.HexOrDecimal64(g.GasUsed)
 	enc.ParentHash = g.ParentHash
-	return json.Marshal(&enc)
+	return json.MarshalIndent(&enc, "", "")
 }
