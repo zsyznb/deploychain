@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"createChain/config"
+	"createChain/stringConst"
+	"createChain/types"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"flag"
@@ -14,48 +16,45 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"math/big"
 	"os"
+	"sort"
+	"strconv"
 )
 
 var (
 	HotstuffExtraSeal    = 65
 	HotstuffExtraVanity  = 32
-	GenesisBlockPerEpoch = new(big.Int).SetUint64(30)
-	nodeNum              int
+	GenesisBlockPerEpoch = new(big.Int).SetUint64(400000)
 	configPath           string
 )
 
-type Discv5NodeID [64]byte
-
-type HotstuffExtra struct {
-	StartHeight   uint64           // denote the epoch start height
-	EndHeight     uint64           // the epoch end height
-	Validators    []common.Address // consensus participants address for next epoch, and in the first block, it contains all genesis validators. keep empty if no epoch change.
-	Seal          []byte           // proposer signature
-	CommittedSeal [][]byte         // consensus participants signatures and it's size should be greater than 2/3 of validators
-	Salt          []byte           // omit empty
-}
-
-type Node struct {
-	Addr common.Address
-
-	NodeKey string
-	PubKey  string
-	Static  string
-}
-
-type Nodes []*Node
-
 func init() {
-	flag.IntVar(&nodeNum, "nodenum", 4, "number of nodes")
 	flag.StringVar(&configPath, "config", "config.json", "config path")
 	flag.Parse()
 
 }
 func main() {
-	config.LoadConfig(configPath, nodeNum)
-	_, extra := generateNodes(config.Conf.NodeNum, config.Conf.Machines, config.Conf.P2PPort)
-	log.Info(extra)
-	makeDir(config.Conf.NodeNum)
+	config.LoadConfig(configPath)
+	nodes, extra := generateNodes(config.Conf.NodeNum, config.Conf.Machines) //生成节点和extradata
+	GenerateConfig(nodes, config.Conf.ChainPath)
+	genesis := stringConst.GenerateGenesis(big.NewInt(int64(config.Conf.ChainID)), common.Hex2Bytes(extra[2:]), nodes) //生成genesis文件
+	static := stringConst.GenerateStatic(nodes)
+	makeDir(nodes)                                             //生成文件夹和脚本文件
+	err := WriteGenesis(nodes, genesis, config.Conf.ChainPath) //写入genesis文件
+	if err != nil {
+		panic(err)
+	}
+	err = WriteStatic(nodes, static, config.Conf.ChainPath) //写入static-nodes文件
+	if err != nil {
+		panic(err)
+	}
+	err = WriteKey(nodes, config.Conf.ChainPath) //写入公私钥对
+	if err != nil {
+		panic(err)
+	}
+	err = WriteBash(nodes, config.Conf)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func createBash(path string) *os.File { //创建脚本
@@ -67,20 +66,48 @@ func createBash(path string) *os.File { //创建脚本
 }
 
 func createFile(path string) *os.File { //创建文件
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		panic(err)
 	}
 	return file
 }
 
-func makeDir(n int) []*os.File { //创建文件目录
+func makeDir(nodes types.Nodes) []*os.File { //创建文件目录
 	dirs := make([]*os.File, 0)
-	for i := 0; i < n; i++ {
-		str := fmt.Sprintf("/node%d", i)
-		err := os.Mkdir(config.Conf.ChainPath+str, os.ModePerm)
+	n := len(nodes)
+	for i := 0; i < n; i++ { //创建node文件夹
+		err := os.Mkdir(config.Conf.ChainPath+nodes[i].Name, os.ModePerm)
 		if err != nil {
 			panic(err)
+		}
+	}
+
+	for i := 0; i < n; i++ { //创建setup和node文件夹
+		err := os.MkdirAll(config.Conf.ChainPath+nodes[i].Name+"/setup/node", os.ModePerm)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	bashs := []string{"start.sh", "stop.sh", "init.sh", "build.sh"}
+	for i := 0; i < n; i++ { //创建脚本
+		for _, bash := range bashs {
+			createBash(config.Conf.ChainPath + nodes[i].Name + "/" + bash)
+		}
+	}
+
+	jsons := []string{"genesis.json", "static-nodes.json"}
+	for i := 0; i < n; i++ { //创建genesis.json和static.json
+		for _, json := range jsons {
+			createFile(config.Conf.ChainPath + nodes[i].Name + "/setup/" + json)
+		}
+	}
+
+	keys := []string{"nodekey", "pubkey"}
+	for i := 0; i < n; i++ { //创建nodekey和pubkey文件
+		for _, key := range keys {
+			createFile(config.Conf.ChainPath + nodes[i].Name + "/setup/node/" + key)
 		}
 	}
 
@@ -88,29 +115,29 @@ func makeDir(n int) []*os.File { //创建文件目录
 	return dirs
 }
 
-func generateNodes(n int, machines []string, port uint64) (Nodes, string) { //生成节点
-	nodes := make([]*Node, 0)
+func generateNodes(n int, machines []config.MachineConfig) (types.Nodes, string) { //生成节点
+	nodes := make([]*types.Node, 0)
+
+	//生成Validator账户和Signer账户
+	Signers := GenerateAccounts(n)
+	Validators := GenerateAccounts(n)
 	for i := 0; i < n; i++ {
-		key, _ := crypto.GenerateKey()
-		nodekey := hexutil.Encode(crypto.FromECDSA(key))
-		node := &Node{
-			Addr:    crypto.PubkeyToAddress(key.PublicKey),
-			NodeKey: nodekey,
-			PubKey:  hexutil.Encode(crypto.CompressPubkey(&key.PublicKey)),
-			Static:  fmt.Sprintf("enode://%s@%s:%v?discport=0", PubkeyID(&key.PublicKey), machines[i], port),
+		key, _ := crypto.HexToECDSA(Validators[i].NodeKey[2:])
+		node := &types.Node{
+			Name:      fmt.Sprintf("node%d", i),
+			Signer:    Signers[i],
+			Validator: Validators[i],
+			Static:    fmt.Sprintf("enode://%s@%s:%s?discport=0", PubkeyID(&key.PublicKey), machines[i].MachineIP, machines[i].P2PPort),
 		}
 		nodes = append(nodes, node)
 	}
-	log.Info("生成节点成功！")
-	sortedNodes := sortNodes(nodes)
-	log.Info("节点排序成功！")
-	extra := generateExtra(NodesAddress(sortedNodes))
-	log.Info("genesis extra创建成功！")
-	return sortedNodes, extra
+
+	extra := generateExtra(NodesAddress(nodes))
+	return nodes, extra
 }
 
-func PubkeyID(pub *ecdsa.PublicKey) Discv5NodeID {
-	var id Discv5NodeID
+func PubkeyID(pub *ecdsa.PublicKey) types.Discv5NodeID {
+	var id types.Discv5NodeID
 	pbytes := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 	if len(pbytes)-1 != len(id) {
 		panic(fmt.Errorf("need %d bit pubkey, got %d bits", (len(id)+1)*8, len(pbytes)))
@@ -119,64 +146,59 @@ func PubkeyID(pub *ecdsa.PublicKey) Discv5NodeID {
 	return id
 }
 
-func sortNodes(nodes Nodes) Nodes {
-	oriAddrs := make([]common.Address, len(nodes))
-	Nodeindex := make(map[common.Address]int)
-	for index, node := range nodes {
+func GenerateAccounts(n int) []types.Account {
+	var Accs []types.Account
+	for i := 0; i < n; i++ {
+		key, _ := crypto.GenerateKey()
+		account := types.Account{
+			Addr:    crypto.PubkeyToAddress(key.PublicKey),
+			NodeKey: hexutil.Encode(crypto.FromECDSA(key)),
+			PubKey:  hexutil.Encode(crypto.CompressPubkey(&key.PublicKey)),
+		}
+		Accs = append(Accs, account)
+	}
+	Accs = sortAccounts(Accs)
+	return Accs
+}
+
+func sortAccounts(accs []types.Account) []types.Account { //对账号排序
+	oriAddrs := make([]common.Address, 0)
+	AccIndex := make(map[common.Address]int)
+	for index, node := range accs {
 		oriAddrs = append(oriAddrs, node.Addr)
-		Nodeindex[node.Addr] = index
+		AccIndex[node.Addr] = index
 	}
 
-	sort(oriAddrs)
-	list := make([]*Node, 0)
+	sort.Slice(oriAddrs, func(i, j int) bool {
+		var flag1 bool
+		for n := 0; n < 20; n++ {
+			if oriAddrs[i][n] > oriAddrs[j][n] {
+				flag1 = false
+				break
+			}
+			if oriAddrs[i][n] < oriAddrs[j][n] {
+				flag1 = true
+				break
+			}
+			if oriAddrs[i][n] == oriAddrs[j][n] {
+				continue
+			}
+		}
+		return flag1
+	})
+	list := make([]types.Account, 0)
 	for _, addr := range oriAddrs {
-		list = append(list, nodes[Nodeindex[addr]])
+		list = append(list, accs[AccIndex[addr]])
 	}
+
 	return list
 
 }
 
-func sort(addrs []common.Address) {
-	for n := 0; n < len(addrs); n++ {
-		for i := 0; i < len(addrs)-1; i++ {
-			if Compare(addrs[i], addrs[i+1]) == 1 {
-				Swap(addrs[i], addrs[i+1])
-			}
-
-		}
-	}
-
-}
-
-//当addr1 > addr2时，返回值为1；
-//当addr1 < addr2时，返回值为0；
-func Compare(addr1 common.Address, addr2 common.Address) int {
-	var flag1 int = 2
-	length := len(addr1)
-	for i := 0; i < int(length); i++ {
-		if addr1[i] > addr2[i] {
-			flag1 = 1
-			break
-		}
-		if addr1[i] < addr2[i] {
-			flag1 = 0
-			break
-		}
-	}
-	return flag1
-}
-
-func Swap(a interface{}, b interface{}) {
-	var c interface{}
-	c = a
-	a = b
-	b = c
-}
-
-func NodesAddress(src []*Node) []common.Address {
+func NodesAddress(src []*types.Node) []common.Address {
 	list := make([]common.Address, 0)
 	for _, v := range src {
-		list = append(list, v.Addr)
+		list = append(list, v.Validator.Addr)
 	}
 	return list
 }
@@ -184,7 +206,7 @@ func NodesAddress(src []*Node) []common.Address {
 func generateExtra(addrs []common.Address) string {
 	var vanity []byte
 	vanity = append(vanity, bytes.Repeat([]byte{0x00}, HotstuffExtraVanity)...)
-	ist := &HotstuffExtra{
+	ist := &types.HotstuffExtra{
 		StartHeight:   0,
 		EndHeight:     GenesisBlockPerEpoch.Uint64(),
 		Validators:    addrs,
@@ -197,4 +219,152 @@ func generateExtra(addrs []common.Address) string {
 	}
 
 	return "0x" + common.Bytes2Hex(append(vanity, payload...))
+}
+
+func WriteGenesis(nodes types.Nodes, genesis string, filepath string) error {
+	for i := range nodes {
+		file, err := os.OpenFile(filepath+nodes[i].Name+"/setup/genesis.json", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+
+		if err != nil {
+			return err
+		}
+		_, err = file.WriteString(genesis)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func WriteStatic(nodes types.Nodes, static string, filepath string) error {
+	for i := range nodes {
+		file, err := os.OpenFile(filepath+nodes[i].Name+"/setup/static-nodes.json", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+		if err != nil {
+			return err
+		}
+		_, err = file.WriteString(static)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+
+func WriteKey(nodes types.Nodes, filepath string) error {
+	for i := range nodes {
+		file, err := os.OpenFile(filepath+nodes[i].Name+"/setup/node/nodekey", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+
+		if err != nil {
+			return err
+		}
+		_, err = file.WriteString(nodes[i].Validator.NodeKey[2:])
+		if err != nil {
+			return err
+		}
+	}
+	for i := range nodes {
+		file, err := os.OpenFile(filepath+nodes[i].Name+"/setup/node/pubkey", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+		if err != nil {
+			return err
+		}
+		_, err = file.WriteString(nodes[i].Validator.PubKey[2:])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+
+func WriteBash(nodes types.Nodes, Conf *config.Config) error { //写入脚本文件
+	filepath := Conf.ChainPath
+	for index, node := range nodes {
+		//写入build.sh
+		build1 := fmt.Sprintf("cd %sZion\n", filepath)
+		build := "#!/bin/bash\n\nworkdir=$PWD\n" + build1 + "make geth\ncp build/bin/geth $workdir\n\ncd $workdir\nmd5sum geth\n"
+		fileBuild, err := os.OpenFile(filepath+node.Name+"/build.sh", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+		if err != nil {
+			return err
+		}
+		_, err = fileBuild.WriteString(build)
+		if err != nil {
+			return err
+		}
+
+		//写入stop.sh
+		stop := "#!/bin/bash\n        \nkill -s SIGINT $(ps aux|grep geth|grep node|grep -v grep|awk '{print $2}');\nps -ef|grep geth"
+		fileStop, err := os.OpenFile(filepath+node.Name+"/stop.sh", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+		if err != nil {
+			return err
+		}
+		_, err = fileStop.WriteString(stop)
+		if err != nil {
+			return err
+		}
+
+		//写入init.sh
+		init := "#!/bin/bash\n\nif [ ! -f node/genesis.json ]\nthen\nmkdir -p node/geth/\ncp setup/genesis.json node/\nfi\n\nif [ ! -f node/static-nodes.json ]\nthen\ncp setup/static-nodes.json node/\nfi\n\nif [ ! -f node/geth/nodekey ]\nthen\ncp setup/node/nodekey node/geth/\nfi\n\n./geth init node/genesis.json --datadir node\n"
+		fileInit, err := os.OpenFile(filepath+node.Name+"/init.sh", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+		if err != nil {
+			return err
+		}
+		_, err = fileInit.WriteString(init)
+		if err != nil {
+			return err
+		}
+
+		//写入start.sh
+		startP2P := fmt.Sprintf("startP2PPort=%s\n", Conf.Machines[index].P2PPort)
+		startRPC := fmt.Sprintf("startRPCPort=%s\n", Conf.Machines[index].RPCPort)
+		startChainID := fmt.Sprintf("chainID=%s\n", strconv.Itoa(int(Conf.ChainID)))
+		startCoinbase := "coinbases=("
+		for index, node := range nodes {
+			if index != len(nodes)-1 {
+				str := fmt.Sprintf("%s\t", node.Validator.Addr.String())
+				startCoinbase = startCoinbase + str
+			}
+			if index == len(nodes)-1 {
+				str := fmt.Sprintf("%s)\n", node.Validator.Addr.String())
+				startCoinbase = startCoinbase + str
+			}
+
+		}
+		startMiner := fmt.Sprintf("miner=%s\n", node.Validator.Addr.String())
+		startEcho := "echo \"node" + strconv.Itoa(index) + " and miner is " + node.Validator.Addr.String() + "\""
+		startGeth := "\nnohup ./geth --mine --miner.threads 1 \\\n--miner.etherbase=$miner \\\n--identity=node \\\n--maxpeers=100 \\\n--light.serve 20 \\\n--syncmode full \\\n--gcmode archive \\\n--allow-insecure-unlock \\\n--datadir node \\\n--networkid $chainID \\\n--http.api admin,eth,debug,miner,net,txpool,personal,web3 \\\n--http --http.addr 0.0.0.0 --http.port $startRPCPort --http.vhosts \"*\" \\\n--rpc.allow-unprotected-txs \\\n--nodiscover \\\n--port $startP2PPort \\\n--verbosity 5 >> node/node.log 2>&1 &\nsleep 1s\nps -ef|grep geth "
+		start := "#!/bin/bash\n" + startP2P + startRPC + startChainID + startCoinbase + startMiner + startEcho + startGeth
+		fileStart, err := os.OpenFile(filepath+node.Name+"/start.sh", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
+		if err != nil {
+			return err
+		}
+		_, err = fileStart.WriteString(start)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func GenerateConfig(nodes types.Nodes, filepath string) error {
+
+	file := createFile(filepath + "chainConfig")
+	str := "Validators:\n"
+	for _, node := range nodes {
+		str = str + "Addr:" + node.Validator.Addr.String() + "\t"
+		str = str + "Pubkey:" + node.Validator.PubKey + "\t"
+		str = str + "Nodekey:" + node.Validator.NodeKey + "\n"
+	}
+	str = str + "\nSigners:\n"
+	for _, node := range nodes {
+		str = str + "Addr:" + node.Signer.Addr.String() + "\t"
+		str = str + "Pubkey:" + node.Signer.PubKey + "\t"
+		str = str + "Nodekey:" + node.Signer.NodeKey + "\n"
+	}
+	_, err := file.WriteString(str)
+	if err != nil {
+		return err
+	}
+	return nil
+
 }

@@ -1,7 +1,0 @@
-GOCMD=GO111MODULE=on go
-GOBUILD=$(GOCMD) build
-GOTEST=$(GOCMD) test
-ENV=$(ONROBOT)
-
-compile:
-	@$(GOBUILD) -o ./create  main.go
