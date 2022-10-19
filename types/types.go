@@ -11,6 +11,12 @@ import (
 	"math/big"
 )
 
+var (
+	HotstuffExtraSeal    = 65
+	HotstuffExtraVanity  = 32
+	GenesisBlockPerEpoch = new(big.Int).SetUint64(400000)
+)
+
 type Discv5NodeID [64]byte
 
 type HotstuffExtra struct {
