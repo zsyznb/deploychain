@@ -335,7 +335,7 @@ func WriteBash(nodes types.Nodes, Conf *config.Config) error { //写入脚本文
 
 func GenerateConfig(nodes types.Nodes, Conf *config.Config) error {
 	filepath := Conf.ChainPath
-	file := createFile(filepath + "chainConfig")
+	file, _ := os.Create(filepath + "chainConfig")
 	str := "Validators:\n"
 	for _, node := range nodes {
 		str = str + "Addr:" + node.Validator.Addr.String() + "\t"
