@@ -2,11 +2,16 @@ package config
 
 import (
 	"createChain/files"
+	"createChain/types"
 	"encoding/json"
 	"fmt"
 )
 
-var Conf *Config
+var (
+	Conf       *Config
+	Validators []types.Account
+	Signers    []types.Account
+)
 
 type MachineConfig struct {
 	MachineIP string
@@ -45,5 +50,24 @@ func LoadConfig(filepath string) {
 			panic("node number must be equal to length of machines!")
 		}
 	}
+}
 
+func LoadValidators(filepath string) {
+	data, err := files.ReadFile(filepath)
+	if err != nil {
+		panic(err)
+	}
+	if err := json.Unmarshal(data, &Validators); err != nil {
+		panic(err)
+	}
+}
+
+func LoadSigners(filepath string) {
+	data, err := files.ReadFile(filepath)
+	if err != nil {
+		panic(err)
+	}
+	if err := json.Unmarshal(data, &Signers); err != nil {
+		panic(err)
+	}
 }
