@@ -332,26 +332,3 @@ func WriteBash(nodes types.Nodes, Conf *config.Config) error { //写入脚本文
 	}
 	return nil
 }
-
-func GenerateConfig(nodes types.Nodes, Conf *config.Config) error {
-	filepath := Conf.ChainPath
-	file := createFile(filepath + "chainConfig")
-	str := "Validators:\n"
-	for _, node := range nodes {
-		str = str + "Addr:" + node.Validator.Addr.String() + "\t"
-		str = str + "Pubkey:" + node.Validator.PubKey + "\t"
-		str = str + "Nodekey:" + node.Validator.NodeKey + "\n"
-	}
-	str = str + "\nSigners:\n"
-	for _, node := range nodes {
-		str = str + "Addr:" + node.Signer.Addr.String() + "\t"
-		str = str + "Pubkey:" + node.Signer.PubKey + "\t"
-		str = str + "Nodekey:" + node.Signer.NodeKey + "\n"
-	}
-	_, err := file.WriteString(str)
-	if err != nil {
-		return err
-	}
-	return nil
-
-}

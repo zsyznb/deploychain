@@ -34,10 +34,6 @@ func main() {
 	//生成节点和extra data
 	nodes, extra := generate.GenerateNodes(config.Conf, config.Validators, config.Signers)
 	log.Info("生成节点和extra data成功！")
-	err := generate.GenerateConfig(nodes, config.Conf) //生成节点配置信息
-	if err != nil {
-		panic(err)
-	}
 
 	//生成genesis文件和static文件
 	log.Info("生成节点配置信息成功！")
@@ -48,7 +44,7 @@ func main() {
 	//生成文件夹和脚本文件
 	generate.MakeDir(nodes, config.Conf) //生成文件夹和脚本文件
 	log.Info("创建文件夹成功！")
-	err = generate.WriteGenesis(nodes, genesis, config.Conf) //写入genesis文件
+	err := generate.WriteGenesis(nodes, genesis, config.Conf) //写入genesis文件
 	if err != nil {
 		panic(err)
 	}
