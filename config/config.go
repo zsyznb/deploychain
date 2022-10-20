@@ -3,6 +3,7 @@ package config
 import (
 	"createChain/files"
 	"encoding/json"
+	"fmt"
 )
 
 var Conf *Config
@@ -17,6 +18,7 @@ type Config struct {
 	ChainID   uint64
 	Machines  []MachineConfig
 	ChainPath string
+	AutoAlloc bool
 }
 
 func LoadConfig(filepath string) {
@@ -27,8 +29,21 @@ func LoadConfig(filepath string) {
 	if err := json.Unmarshal(data, &Conf); err != nil {
 		panic(err)
 	}
-	if Conf.NodeNum != len(Conf.Machines) {
-		panic("node number must be equal to length of machines!")
+	if Conf.AutoAlloc {
+		mcs := make([]MachineConfig, 0)
+		for i := 0; i < Conf.NodeNum; i++ {
+			mc := MachineConfig{
+				MachineIP: "localhost",
+				P2PPort:   fmt.Sprintf("3030%d", i),
+				RPCPort:   fmt.Sprintf("2200%d", i),
+			}
+			mcs = append(mcs, mc)
+		}
+		Conf.Machines = mcs
+	} else {
+		if Conf.NodeNum != len(Conf.Machines) {
+			panic("node number must be equal to length of machines!")
+		}
 	}
 
 }

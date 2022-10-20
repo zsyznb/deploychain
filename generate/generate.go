@@ -72,8 +72,10 @@ func MakeDir(nodes types.Nodes) []*os.File { //创建文件目录
 	return dirs
 }
 
-func GenerateNodes(n int, machines []config.MachineConfig) (types.Nodes, string) { //生成节点
+func GenerateNodes(Conf *config.Config) (types.Nodes, string) { //生成节点
 	nodes := make([]*types.Node, 0)
+	n := Conf.NodeNum
+	machines := Conf.Machines
 
 	//生成Validator账户和Signer账户
 	Signers := GenerateAccounts(n)
@@ -178,7 +180,8 @@ func generateExtra(addrs []common.Address) string {
 	return "0x" + common.Bytes2Hex(append(vanity, payload...))
 }
 
-func WriteGenesis(nodes types.Nodes, genesis string, filepath string) error {
+func WriteGenesis(nodes types.Nodes, genesis string, Conf *config.Config) error {
+	filepath := Conf.ChainPath
 	for i := range nodes {
 		file, err := os.OpenFile(filepath+nodes[i].Name+"/setup/genesis.json", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 
@@ -193,7 +196,8 @@ func WriteGenesis(nodes types.Nodes, genesis string, filepath string) error {
 	return nil
 }
 
-func WriteStatic(nodes types.Nodes, static string, filepath string) error {
+func WriteStatic(nodes types.Nodes, static string, Conf *config.Config) error {
+	filepath := Conf.ChainPath
 	for i := range nodes {
 		file, err := os.OpenFile(filepath+nodes[i].Name+"/setup/static-nodes.json", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 		if err != nil {
@@ -208,7 +212,8 @@ func WriteStatic(nodes types.Nodes, static string, filepath string) error {
 
 }
 
-func WriteKey(nodes types.Nodes, filepath string) error {
+func WriteKey(nodes types.Nodes, Conf *config.Config) error {
+	filepath := Conf.ChainPath
 	for i := range nodes {
 		file, err := os.OpenFile(filepath+nodes[i].Name+"/setup/node/nodekey", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 
@@ -303,8 +308,8 @@ func WriteBash(nodes types.Nodes, Conf *config.Config) error { //写入脚本文
 	return nil
 }
 
-func GenerateConfig(nodes types.Nodes, filepath string) error {
-
+func GenerateConfig(nodes types.Nodes, Conf *config.Config) error {
+	filepath := Conf.ChainPath
 	file := createFile(filepath + "chainConfig")
 	str := "Validators:\n"
 	for _, node := range nodes {
