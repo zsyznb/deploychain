@@ -99,19 +99,6 @@ func LevelName(level int) string {
 	return NAME_PREFIX + strconv.Itoa(level)
 }
 
-func NameLevel(name string) int {
-	for k, v := range levels {
-		if v == name {
-			return k
-		}
-	}
-	var level int
-	if strings.HasPrefix(name, NAME_PREFIX) {
-		level, _ = strconv.Atoi(name[len(NAME_PREFIX):])
-	}
-	return level
-}
-
 type Logger struct {
 	level   int
 	logger  *log.Logger
@@ -227,26 +214,6 @@ func Trace(a ...interface{}) {
 	Log.Trace(a...)
 }
 
-func Tracef(format string, a ...interface{}) {
-	if TraceLog < Log.level {
-		return
-	}
-
-	pc := make([]uintptr, 10)
-	runtime.Callers(2, pc)
-	f := runtime.FuncForPC(pc[0])
-	file, line := f.FileLine(pc[0])
-	fileName := filepath.Base(file)
-
-	nameFull := f.Name()
-	nameEnd := filepath.Ext(nameFull)
-	funcName := strings.TrimPrefix(nameEnd, ".")
-
-	a = append([]interface{}{funcName, fileName, line}, a...)
-
-	Log.Tracef("%s() %s:%d "+format, a...)
-}
-
 func Debug(a ...interface{}) {
 	if DebugLog < Log.level {
 		return
@@ -263,33 +230,12 @@ func Debug(a ...interface{}) {
 	Log.Debug(a...)
 }
 
-func Debugf(format string, a ...interface{}) {
-	if DebugLog < Log.level {
-		return
-	}
-
-	pc := make([]uintptr, 10)
-	runtime.Callers(2, pc)
-	f := runtime.FuncForPC(pc[0])
-	file, line := f.FileLine(pc[0])
-	fileName := filepath.Base(file)
-
-	a = append([]interface{}{f.Name(), fileName, line}, a...)
-
-	Log.Debugf("%s %s:%d "+format, a...)
-}
-
 func Info(a ...interface{}) {
 	Log.Info(a...)
 }
 
 func Split(a ...interface{}) {
 	Log.Info(a...)
-	Log.Info("---------------------------------------------------------------")
-}
-
-func Splitf(format string, a ...interface{}) {
-	Log.Infof(format, a...)
 	Log.Info("---------------------------------------------------------------")
 }
 
@@ -303,14 +249,6 @@ func Error(a ...interface{}) {
 
 func Fatal(a ...interface{}) {
 	Log.Fatal(a...)
-}
-
-func Infof(format string, a ...interface{}) {
-	Log.Infof(format, a...)
-}
-
-func Warnf(format string, a ...interface{}) {
-	Log.Warnf(format, a...)
 }
 
 func Errorf(format string, a ...interface{}) {
@@ -395,25 +333,4 @@ func GetMaxLogChangeInterval(maxLogSize int64) int64 {
 	} else {
 		return DEFAULT_MAX_LOG_SIZE * BYTE_TO_MB
 	}
-}
-
-func CheckIfNeedNewFile() bool {
-	logFileSize, err := GetLogFileSize()
-	maxLogFileSize := GetMaxLogChangeInterval(0)
-	if err != nil {
-		return false
-	}
-	if logFileSize > maxLogFileSize {
-		return true
-	} else {
-		return false
-	}
-}
-
-func ClosePrintLog() error {
-	var err error
-	if Log.logFile != nil {
-		err = Log.logFile.Close()
-	}
-	return err
 }
