@@ -84,7 +84,7 @@ func GetGID() uint64 {
 	n, _ := strconv.ParseUint(string(b), 10, 64)
 	return n
 }
-gi
+
 var Log *Logger
 
 func init() {
