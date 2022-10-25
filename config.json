@@ -1,12 +1,12 @@
 {
   "NodeNum":4,
   "ChainID": 60801,
-  "AutoAlloc":true,
+  "AutoAlloc":false,
   "Machines":[
     {"MachineIP": "10.203.0.20","P2PPort": "30300","RPCPort": "22000"},
     {"MachineIP": "10.203.0.43","P2PPort": "30300","RPCPort": "22000"},
     {"MachineIP": "10.203.0.43","P2PPort": "30301","RPCPort": "22001"},
     {"MachineIP": "10.203.0.20","P2PPort": "30301","RPCPort": "22001"}
   ],
-  "ChainPath": "/Users/zhaosiyuan/software/hotstuff/test/"
+  "ChainPath": "/data/zion/"
 }
