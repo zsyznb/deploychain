@@ -2,6 +2,7 @@ package config
 
 import (
 	"createChain/files"
+	"createChain/ip"
 	"createChain/types"
 	"encoding/json"
 	"fmt"
@@ -38,7 +39,7 @@ func LoadConfig(filepath string) {
 		mcs := make([]MachineConfig, 0)
 		for i := 0; i < Conf.NodeNum; i++ {
 			mc := MachineConfig{
-				MachineIP: "localhost",
+				MachineIP: ip.IP,
 				P2PPort:   fmt.Sprintf("3030%d", i),
 				RPCPort:   fmt.Sprintf("2200%d", i),
 			}

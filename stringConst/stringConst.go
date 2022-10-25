@@ -35,7 +35,6 @@ func GenerateGenesis(Conf *config.Config, extra string, nodes types.Nodes) strin
 		} else {
 			raw = types.GenesisAccount{Balance: "10000000000000000000000000"}
 		}
-
 		rawGenesisAlloc[config.Signers[i].Addr] = raw
 	}
 	rawGenesis.Alloc = rawGenesisAlloc

@@ -40,7 +40,7 @@ func MakeDir(nodes types.Nodes, Conf *config.Config) { //创建文件目录
 	for i := 0; i < n; i++ { //创建node文件夹
 		fmt.Println(machines[i].MachineIP, ip.IP)
 		if machines[i].MachineIP == ip.IP {
-			err := os.Mkdir(config.Conf.ChainPath+nodes[i].Name, os.ModePerm)
+			err := os.MkdirAll(config.Conf.ChainPath+nodes[i].Name, os.ModePerm)
 			if err != nil {
 				panic(err)
 			}
@@ -267,7 +267,7 @@ func WriteBash(nodes types.Nodes, Conf *config.Config) error { //写入脚本文
 		if Conf.Machines[index].MachineIP == ip.IP {
 
 			//写入build.sh
-			build1 := "cd /data/gohome/src/Zion\n"
+			build1 := "cd ../Zion\n"
 			build := "#!/bin/bash\n\nworkdir=$PWD\n" + build1 + "make geth\ncp build/bin/geth $workdir\n\ncd $workdir\nmd5sum geth\n"
 			fileBuild, err := os.OpenFile(filepath+node.Name+"/build.sh", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 			if err != nil {
