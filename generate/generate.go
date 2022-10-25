@@ -267,7 +267,7 @@ func WriteBash(nodes types.Nodes, Conf *config.Config) error { //写入脚本文
 		if Conf.Machines[index].MachineIP == ip.IP {
 
 			//写入build.sh
-			build1 := "cd ../Zion\n"
+			build1 := "cd /data/gohome/src/Zion\n"
 			build := "#!/bin/bash\n\nworkdir=$PWD\n" + build1 + "make geth\ncp build/bin/geth $workdir\n\ncd $workdir\nmd5sum geth\n"
 			fileBuild, err := os.OpenFile(filepath+node.Name+"/build.sh", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0777)
 			if err != nil {
