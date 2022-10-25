@@ -28,13 +28,9 @@ func GenerateGenesis(Conf *config.Config, extra string, nodes types.Nodes) strin
 		}
 		rawGenesis.Governance = append(rawGenesis.Governance, *rawAccount)
 	}
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 20; i++ {
 		var raw types.GenesisAccount
-		if i == 0 {
-			raw = types.GenesisAccount{Balance: "30000000000000000000000000"}
-		} else {
-			raw = types.GenesisAccount{Balance: "10000000000000000000000000"}
-		}
+		raw = types.GenesisAccount{Balance: "5000000000000000000000000"}
 		rawGenesisAlloc[config.Signers[i].Addr] = raw
 	}
 	rawGenesis.Alloc = rawGenesisAlloc
