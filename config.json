@@ -7,11 +7,11 @@
     {"MachineIP": "10.203.16.5","P2PPort": "30300","RPCPort": "22000"},
     {"MachineIP": "10.203.16.21","P2PPort": "30300","RPCPort": "22000"},
     {"MachineIP": "10.203.16.15","P2PPort": "30300","RPCPort": "22000"},
-    {"MachineIP": "10.203.16.41","P2PP0rt": "30300","RPCPort": "22000"},
-    {"MachineIP": "10.203.16.29","P2PP0rt": "30300","RPCPort": "22000"},
-    {"MachineIP": "10.203.16.7","P2PP0rt": "30300","RPCPort": "22000"},
-    {"MachineIP": "10.203.0.20","P2PP0rt": "30300","RPCPort": "22000"},
-    {"MachineIP": "10.203.0.43","P2PP0rt": "30300","RPCPort": "22000"}
+    {"MachineIP": "10.203.16.41","P2PPort": "30300","RPCPort": "22000"},
+    {"MachineIP": "10.203.16.29","P2PPort": "30300","RPCPort": "22000"},
+    {"MachineIP": "10.203.16.7","P2PPort": "30300","RPCPort": "22000"},
+    {"MachineIP": "10.203.0.20","P2PPort": "30300","RPCPort": "22000"},
+    {"MachineIP": "10.203.0.43","P2PPort": "30300","RPCPort": "22000"}
   ],
   "ChainPath": "/data/zion/"
 }
